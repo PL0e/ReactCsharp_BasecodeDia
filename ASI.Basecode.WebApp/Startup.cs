@@ -17,6 +17,7 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace ASI.Basecode.WebApp
 {
@@ -83,7 +84,7 @@ namespace ASI.Basecode.WebApp
             services.AddMemoryCache();
 
             // Register SQL database configuration context as services.
-            services.AddDbContext<AsiBasecodeDBContext>(options =>
+            services.AddDbContext<IticketG2dbContext>(options =>
             {
                 options.UseSqlServer(
                     Configuration.GetConnectionString("DefaultConnection"),
@@ -145,10 +146,12 @@ namespace ASI.Basecode.WebApp
             // Localization
             var options = this._app.ApplicationServices.GetService<IOptions<RequestLocalizationOptions>>();
             this._app.UseRequestLocalization(options.Value);
-            this._app.UseCors("AllowReactApp");
+            
 
             this._app.UseSession();
             this._app.UseRouting();
+
+            this._app.UseCors("AllowReactApp");
 
             this._app.UseAuthentication();
             this._app.UseAuthorization();

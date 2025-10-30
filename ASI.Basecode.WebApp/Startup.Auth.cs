@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using System.Threading.Tasks;
 
 namespace ASI.Basecode.WebApp
 {
@@ -40,11 +41,34 @@ namespace ASI.Basecode.WebApp
                     SecurePolicy = CookieSecurePolicy.SameAsRequest,
                     Name = $"{this._environment.ApplicationName}_{token.CookieName}"
                 };
+
+                // ❌ Don't redirect for APIs
+                options.Events = new Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationEvents
+                {
+                    OnRedirectToLogin = ctx =>
+                    {
+                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return Task.CompletedTask;
+                    },
+                    OnRedirectToAccessDenied = ctx =>
+                    {
+                        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        return Task.CompletedTask;
+                    }
+                };
+
+                // These are for web apps, but we'll keep them just in case
                 options.LoginPath = new PathString("/Account/Login");
                 options.AccessDeniedPath = new PathString("/html/Forbidden.html");
                 options.ReturnUrlParameter = "ReturnUrl";
-                options.TicketDataFormat = new CustomJwtDataFormat(SecurityAlgorithms.HmacSha256, _tokenValidationParameters, Configuration, tokenProviderOptionsFactory);
+                options.TicketDataFormat = new CustomJwtDataFormat(
+                    SecurityAlgorithms.HmacSha256,
+                    _tokenValidationParameters,
+                    Configuration,
+                    tokenProviderOptionsFactory
+                );
             });
+
 
             this._services.AddAuthorization(options =>
             {

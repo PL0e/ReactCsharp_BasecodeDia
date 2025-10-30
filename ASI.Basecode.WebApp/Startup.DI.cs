@@ -32,10 +32,18 @@ namespace ASI.Basecode.WebApp
             // Services
             this._services.TryAddSingleton<TokenValidationParametersFactory>();
             this._services.AddScoped<IUserService, UserService>();
+            this._services.AddScoped<ITicketService, TicketService>();
+            this._services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
+            this._services.AddScoped<IPreferenceService, PreferenceService>();
+            this._services.AddScoped<IFeedbackService, FeedbackService>();
 
 
             // Repositories
             this._services.AddScoped<IUserRepository, UserRepository>();
+            this._services.AddScoped<ITicketRepository, TicketRepository>();
+            this._services.AddScoped<IKnowledgeBaseRepository, KnowledgeBaseRepository>();
+            this._services.AddScoped<IPreferenceRepository, PreferenceRepository>();
+            this._services.AddScoped<IFeedbackRepository, FeedbackRepository>();
 
             // Manager Class
             this._services.AddScoped<SignInManager>();
@@ -47,7 +55,8 @@ namespace ASI.Basecode.WebApp
                 options.AddPolicy("AllowReactApp",
                     builder => builder.WithOrigins("http://localhost:8080")
                                       .AllowAnyHeader()
-                                      .AllowAnyMethod());
+                                      .AllowAnyMethod()
+                                      .AllowCredentials());
             });
             this._services.AddControllers();
         }

@@ -9,10 +9,10 @@ namespace ASI.Basecode.WebApp.Models
     public class LoginViewModel
     {
         /// <summary>ユーザーID</summary>
-        [JsonPropertyName("userId")]
-        [Required(ErrorMessage = "UserId is required.")]
-        public string UserId { get; set; }
-        /// <summary>パスワード</summary>
+        [JsonPropertyName("email")]
+        [Required(ErrorMessage = "Email is required.")]
+        public string Email { get; set; }
+
         [JsonPropertyName("password")]
         [Required(ErrorMessage = "Password is required.")]
         public string Password { get; set; }

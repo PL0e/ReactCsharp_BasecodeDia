@@ -1,6 +1,7 @@
 ﻿using ASI.Basecode.Data.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Threading.Tasks;
 
 namespace ASI.Basecode.Data
 {
@@ -19,7 +20,7 @@ namespace ASI.Basecode.Data
         /// Initializes a new instance of the UnitOfWork class.
         /// </summary>
         /// <param name="serviceContext">The service context.</param>
-        public UnitOfWork(AsiBasecodeDBContext serviceContext)
+        public UnitOfWork(IticketG2dbContext serviceContext)
         {
             Database = serviceContext;
         }
@@ -30,6 +31,11 @@ namespace ASI.Basecode.Data
         public void SaveChanges()
         {
             Database.SaveChanges();
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await Database.SaveChangesAsync();
         }
 
         /// <summary>
