@@ -133,13 +133,13 @@ namespace ASI.Basecode.WebApp
             if (!this._environment.IsDevelopment())
             {
                 this._app.UseHsts();
+                this._app.UseHttpsRedirection();
             }
 
             this.ConfigureLogger();
 
             this._app.UseTokenProvider(_tokenProviderOptions);
 
-            this._app.UseHttpsRedirection();
             this._app.UseStaticFiles();
 
             // Localization
