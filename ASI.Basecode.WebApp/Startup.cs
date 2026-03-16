@@ -14,9 +14,11 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace ASI.Basecode.WebApp
 {
@@ -92,6 +94,16 @@ namespace ASI.Basecode.WebApp
 
             services.AddRazorPages().AddRazorRuntimeCompilation();
 
+            services.AddEndpointsApiExplorer();
+            services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "Student Advising API",
+                    Version = "v1"
+                });
+            });
+
             //Configuration
             services.Configure<TokenAuthentication>(Configuration.GetSection("TokenAuthentication"));
 
@@ -142,6 +154,13 @@ namespace ASI.Basecode.WebApp
 
             this._app.UseStaticFiles();
 
+            this._app.UseSwagger();
+            this._app.UseSwaggerUI(options =>
+            {
+                options.SwaggerEndpoint("/swagger/v1/swagger.json", "Student Advising API v1");
+                options.RoutePrefix = "swagger";
+            });
+
             // Localization
             var options = this._app.ApplicationServices.GetService<IOptions<RequestLocalizationOptions>>();
             this._app.UseRequestLocalization(options.Value);
@@ -152,7 +171,15 @@ namespace ASI.Basecode.WebApp
 
             this._app.UseAuthentication();
             this._app.UseAuthorization();
-            this._app.UseEndpoints(endpoints => endpoints.MapControllers());
+            this._app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapGet("/", context =>
+                {
+                    context.Response.Redirect("/swagger");
+                    return Task.CompletedTask;
+                });
+                endpoints.MapControllers();
+            });
         }
     }
 }
