@@ -28,7 +28,6 @@ configurer.ConfigureServices(appBuilder.Services);
 var app = appBuilder.Build();
 
 configurer.ConfigureApp(app, app.Environment);
-app.MapControllers();
 
 // Run application
 app.Run();
