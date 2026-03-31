@@ -168,6 +168,8 @@ namespace ASI.Basecode.WebApp
             this._app = app;
             this._environment = env;
 
+            EnsureDatabaseSchema();
+
             if (!this._environment.IsDevelopment())
             {
                 this._app.UseHsts();
@@ -206,6 +208,29 @@ namespace ASI.Basecode.WebApp
                 });
                 endpoints.MapControllers();
             });
+        }
+
+        private void EnsureDatabaseSchema()
+        {
+            using var scope = _app.ApplicationServices.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AsiBasecodeDBContext>();
+
+            context.Database.ExecuteSqlRaw(@"
+IF COL_LENGTH('dbo.AdviserAssignments', 'isDeleted') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[AdviserAssignments] ADD [isDeleted] BIT NOT NULL DEFAULT (0);
+END
+
+IF COL_LENGTH('dbo.AdviserAssignments', 'deleteDate') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[AdviserAssignments] ADD [deleteDate] DATETIME NULL;
+END
+
+IF COL_LENGTH('dbo.AdviserAssignments', 'deleteName') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[AdviserAssignments] ADD [deleteName] NVARCHAR(100) NULL;
+END
+");
         }
     }
 }

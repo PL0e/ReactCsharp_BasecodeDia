@@ -13,6 +13,10 @@ namespace ASI.Basecode.Data.Models
         public TimeSpan? AppointmentTime { get; set; }
         public string Status { get; set; }
         public string CancellationReason { get; set; }
+        public DateTime? CancellationDate { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeleteDate { get; set; }
+        public string DeleteName { get; set; }
     }
 }

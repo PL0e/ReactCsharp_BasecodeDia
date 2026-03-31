@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ASI.Basecode.WebApp.Controllers
@@ -24,13 +26,13 @@ namespace ASI.Basecode.WebApp.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Student>>> GetAll()
         {
-            return Ok(await _context.Students.AsNoTracking().ToListAsync());
+            return Ok(await _context.Students.AsNoTracking().Where(x => !x.IsDeleted).ToListAsync());
         }
 
         [HttpGet("{id:int}")]
         public async Task<ActionResult<Student>> GetById(int id)
         {
-            var student = await _context.Students.FindAsync(id);
+            var student = await _context.Students.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (student == null) return NotFound();
             return Ok(student);
         }
@@ -38,6 +40,9 @@ namespace ASI.Basecode.WebApp.Controllers
         [HttpPost]
         public async Task<ActionResult<Student>> Create([FromBody] Student student)
         {
+            student.IsDeleted = false;
+            student.DeleteDate = null;
+            student.DeleteName = null;
             _context.Students.Add(student);
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = student.Id }, student);
@@ -47,20 +52,25 @@ namespace ASI.Basecode.WebApp.Controllers
         public async Task<IActionResult> Update(int id, [FromBody] Student student)
         {
             if (id != student.Id) return BadRequest();
-            if (!await _context.Students.AnyAsync(x => x.Id == id)) return NotFound();
+            var existing = await _context.Students.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            if (existing == null) return NotFound();
 
-            _context.Entry(student).State = EntityState.Modified;
+            existing.UserId = student.UserId;
+            existing.YearLevelId = student.YearLevelId;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
+        [ApiExplorerSettings(IgnoreApi = true)]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var student = await _context.Students.FindAsync(id);
+            var student = await _context.Students.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (student == null) return NotFound();
 
-            _context.Students.Remove(student);
+            student.IsDeleted = true;
+            student.DeleteDate = DateTime.Now;
+            student.DeleteName = User?.Identity?.Name ?? User?.FindFirst("UserName")?.Value ?? "system";
             await _context.SaveChangesAsync();
             return NoContent();
         }

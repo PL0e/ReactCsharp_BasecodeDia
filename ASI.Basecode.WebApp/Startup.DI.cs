@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System;
 
 namespace ASI.Basecode.WebApp
 {
@@ -44,14 +45,24 @@ namespace ASI.Basecode.WebApp
 
             this._services.AddCors(options =>
             {
-                options.AddPolicy("AllowReactApp",
-                    builder => builder
-                                      .WithOrigins(
-                                          "http://localhost:5173",  // Vite default
-                                          "http://localhost:8080")  // fallback / production
-                                      .AllowAnyHeader()
-                                      .AllowAnyMethod()
-                                      .AllowCredentials());
+                options.AddPolicy("AllowReactApp", builder =>
+                {
+                    builder
+                        .SetIsOriginAllowed(origin =>
+                        {
+                            if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                            {
+                                return false;
+                            }
+
+                            return uri.Scheme is "http" or "https"
+                                   && (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                                       || uri.Host.Equals("127.0.0.1"));
+                        })
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                });
             });
             this._services.AddControllers();
         }
