@@ -91,32 +91,6 @@ namespace ASI.Basecode.WebApp.Controllers
             });
         }
 
-        [HttpPut("{userId:int}")]
-        public async Task<IActionResult> Update(int userId, [FromBody] UpdateUserRequest request)
-        {
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found." });
-            }
-
-            var role = string.IsNullOrWhiteSpace(request.Role) ? user.Role : request.Role.Trim().ToUpperInvariant();
-            if (!IsAllowedRole(role))
-            {
-                return BadRequest(new { message = "Invalid role." });
-            }
-
-            user.FirstName = request.FirstName?.Trim();
-            user.LastName = request.LastName?.Trim();
-            user.Role = role;
-            user.IsActive = request.IsActive;
-
-            await EnsureRoleProfileAsync(user, request.YearLevelId);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "User updated successfully." });
-        }
-
         [HttpDelete("{userId:int}")]
         public async Task<IActionResult> Delete(int userId)
         {

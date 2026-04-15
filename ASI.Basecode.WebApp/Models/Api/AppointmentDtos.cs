@@ -1,0 +1,35 @@
+using System;
+
+namespace ASI.Basecode.WebApp.Models.Api
+{
+    public class AppointmentResponse
+    {
+        public int AppointmentId { get; set; }
+        public int StudentId { get; set; }
+        public int AdviserId { get; set; }
+        public int SemesterId { get; set; }
+        public string AppointmentType { get; set; }
+        public DateTime? AppointmentDate { get; set; }
+        public TimeSpan? AppointmentTime { get; set; }
+        public string Status { get; set; }
+        public string CancellationReason { get; set; }
+        public DateTime? CancellationDate { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeleteDate { get; set; }
+        public string DeleteName { get; set; }
+    }
+
+    public class UpsertAppointmentRequest
+    {
+        public int StudentId { get; set; }
+        public int AdviserId { get; set; }
+        public int SemesterId { get; set; }
+        public string AppointmentType { get; set; }
+        public DateTime? AppointmentDate { get; set; }
+        public TimeSpan? AppointmentTime { get; set; }
+        public string Status { get; set; }
+        public string CancellationReason { get; set; }
+        public DateTime? CancellationDate { get; set; }
+    }
+}

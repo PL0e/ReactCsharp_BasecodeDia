@@ -1,5 +1,6 @@
 using ASI.Basecode.Data;
 using ASI.Basecode.Data.Models;
+using ASI.Basecode.WebApp.Models.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,55 +25,127 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Appointment>>> GetAll()
+        public async Task<ActionResult<IEnumerable<AppointmentResponse>>> GetAll()
         {
-            return Ok(await _context.Appointments.AsNoTracking().Where(x => !x.IsDeleted).ToListAsync());
+            var appointments = await _context.Appointments.AsNoTracking()
+                .Where(x => !x.IsDeleted)
+                .Select(x => new AppointmentResponse
+                {
+                    AppointmentId = x.Id,
+                    StudentId = x.StudentId,
+                    AdviserId = x.AdviserId,
+                    SemesterId = x.SemesterId,
+                    AppointmentType = x.AppointmentType,
+                    AppointmentDate = x.AppointmentDate,
+                    AppointmentTime = x.AppointmentTime,
+                    Status = x.Status,
+                    CancellationReason = x.CancellationReason,
+                    CancellationDate = x.CancellationDate,
+                    CreatedAt = x.CreatedAt,
+                    IsDeleted = x.IsDeleted,
+                    DeleteDate = x.DeleteDate,
+                    DeleteName = x.DeleteName
+                })
+                .ToListAsync();
+
+            return Ok(appointments);
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<ActionResult<Appointment>> GetById(int id)
+        [HttpGet("{appointmentId:int}")]
+        public async Task<ActionResult<AppointmentResponse>> GetById(int appointmentId)
         {
-            var appointment = await _context.Appointments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var appointment = await _context.Appointments.AsNoTracking()
+                .Where(x => x.Id == appointmentId && !x.IsDeleted)
+                .Select(x => new AppointmentResponse
+                {
+                    AppointmentId = x.Id,
+                    StudentId = x.StudentId,
+                    AdviserId = x.AdviserId,
+                    SemesterId = x.SemesterId,
+                    AppointmentType = x.AppointmentType,
+                    AppointmentDate = x.AppointmentDate,
+                    AppointmentTime = x.AppointmentTime,
+                    Status = x.Status,
+                    CancellationReason = x.CancellationReason,
+                    CancellationDate = x.CancellationDate,
+                    CreatedAt = x.CreatedAt,
+                    IsDeleted = x.IsDeleted,
+                    DeleteDate = x.DeleteDate,
+                    DeleteName = x.DeleteName
+                })
+                .FirstOrDefaultAsync();
+
             if (appointment == null) return NotFound();
             return Ok(appointment);
         }
 
         [HttpPost]
-        public async Task<ActionResult<Appointment>> Create([FromBody] Appointment appointment)
+        public async Task<ActionResult<AppointmentResponse>> Create([FromBody] UpsertAppointmentRequest request)
         {
-            appointment.IsDeleted = false;
-            appointment.DeleteDate = null;
-            appointment.DeleteName = null;
+            var appointment = new Appointment
+            {
+                StudentId = request.StudentId,
+                AdviserId = request.AdviserId,
+                SemesterId = request.SemesterId,
+                AppointmentType = request.AppointmentType,
+                AppointmentDate = request.AppointmentDate,
+                AppointmentTime = request.AppointmentTime,
+                Status = request.Status,
+                CancellationReason = request.CancellationReason,
+                CancellationDate = request.CancellationDate,
+                IsDeleted = false,
+                DeleteDate = null,
+                DeleteName = null
+            };
+
             _context.Appointments.Add(appointment);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = appointment.Id }, appointment);
+
+            var response = new AppointmentResponse
+            {
+                AppointmentId = appointment.Id,
+                StudentId = appointment.StudentId,
+                AdviserId = appointment.AdviserId,
+                SemesterId = appointment.SemesterId,
+                AppointmentType = appointment.AppointmentType,
+                AppointmentDate = appointment.AppointmentDate,
+                AppointmentTime = appointment.AppointmentTime,
+                Status = appointment.Status,
+                CancellationReason = appointment.CancellationReason,
+                CancellationDate = appointment.CancellationDate,
+                CreatedAt = appointment.CreatedAt,
+                IsDeleted = appointment.IsDeleted,
+                DeleteDate = appointment.DeleteDate,
+                DeleteName = appointment.DeleteName
+            };
+
+            return CreatedAtAction(nameof(GetById), new { appointmentId = appointment.Id }, response);
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Appointment appointment)
+        [HttpPut("{appointmentId:int}")]
+        public async Task<IActionResult> Update(int appointmentId, [FromBody] UpsertAppointmentRequest request)
         {
-            if (id != appointment.Id) return BadRequest();
-            var existing = await _context.Appointments.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var existing = await _context.Appointments.FirstOrDefaultAsync(x => x.Id == appointmentId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
-            existing.StudentId = appointment.StudentId;
-            existing.AdviserId = appointment.AdviserId;
-            existing.SemesterId = appointment.SemesterId;
-            existing.AppointmentType = appointment.AppointmentType;
-            existing.AppointmentDate = appointment.AppointmentDate;
-            existing.AppointmentTime = appointment.AppointmentTime;
-            existing.Status = appointment.Status;
-            existing.CancellationReason = appointment.CancellationReason;
-            existing.CancellationDate = appointment.CancellationDate;
+            existing.StudentId = request.StudentId;
+            existing.AdviserId = request.AdviserId;
+            existing.SemesterId = request.SemesterId;
+            existing.AppointmentType = request.AppointmentType;
+            existing.AppointmentDate = request.AppointmentDate;
+            existing.AppointmentTime = request.AppointmentTime;
+            existing.Status = request.Status;
+            existing.CancellationReason = request.CancellationReason;
+            existing.CancellationDate = request.CancellationDate;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{appointmentId:int}")]
+        public async Task<IActionResult> Delete(int appointmentId)
         {
-            var appointment = await _context.Appointments.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var appointment = await _context.Appointments.FirstOrDefaultAsync(x => x.Id == appointmentId && !x.IsDeleted);
             if (appointment == null) return NotFound();
 
             appointment.IsDeleted = true;

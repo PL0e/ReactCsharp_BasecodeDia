@@ -1,5 +1,6 @@
 using ASI.Basecode.Data;
 using ASI.Basecode.Data.Models;
+using ASI.Basecode.WebApp.Models.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,49 +25,94 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<AdviserAssignment>>> GetAll()
+        public async Task<ActionResult<IEnumerable<AdviserAssignmentResponse>>> GetAll()
         {
-            return Ok(await _context.AdviserAssignments.AsNoTracking().Where(x => !x.IsDeleted).ToListAsync());
+            var assignments = await _context.AdviserAssignments.AsNoTracking()
+                .Where(x => !x.IsDeleted)
+                .Select(x => new AdviserAssignmentResponse
+                {
+                    AdviserAssignmentId = x.Id,
+                    AdviserId = x.AdviserId,
+                    YearLevelId = x.YearLevelId,
+                    AssignedAt = x.AssignedAt,
+                    IsDeleted = x.IsDeleted,
+                    DeleteDate = x.DeleteDate,
+                    DeleteName = x.DeleteName
+                })
+                .ToListAsync();
+
+            return Ok(assignments);
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<ActionResult<AdviserAssignment>> GetById(int id)
+        [HttpGet("{adviserAssignmentId:int}")]
+        public async Task<ActionResult<AdviserAssignmentResponse>> GetById(int adviserAssignmentId)
         {
-            var assignment = await _context.AdviserAssignments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var assignment = await _context.AdviserAssignments.AsNoTracking()
+                .Where(x => x.Id == adviserAssignmentId && !x.IsDeleted)
+                .Select(x => new AdviserAssignmentResponse
+                {
+                    AdviserAssignmentId = x.Id,
+                    AdviserId = x.AdviserId,
+                    YearLevelId = x.YearLevelId,
+                    AssignedAt = x.AssignedAt,
+                    IsDeleted = x.IsDeleted,
+                    DeleteDate = x.DeleteDate,
+                    DeleteName = x.DeleteName
+                })
+                .FirstOrDefaultAsync();
+
             if (assignment == null) return NotFound();
             return Ok(assignment);
         }
 
         [HttpPost]
-        public async Task<ActionResult<AdviserAssignment>> Create([FromBody] AdviserAssignment assignment)
+        public async Task<ActionResult<AdviserAssignmentResponse>> Create([FromBody] UpsertAdviserAssignmentRequest request)
         {
-            assignment.IsDeleted = false;
-            assignment.DeleteDate = null;
-            assignment.DeleteName = null;
+            var assignment = new AdviserAssignment
+            {
+                AdviserId = request.AdviserId,
+                YearLevelId = request.YearLevelId,
+                AssignedAt = request.AssignedAt,
+                IsDeleted = false,
+                DeleteDate = null,
+                DeleteName = null
+            };
+
             _context.AdviserAssignments.Add(assignment);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = assignment.Id }, assignment);
+
+            var response = new AdviserAssignmentResponse
+            {
+                AdviserAssignmentId = assignment.Id,
+                AdviserId = assignment.AdviserId,
+                YearLevelId = assignment.YearLevelId,
+                AssignedAt = assignment.AssignedAt,
+                IsDeleted = assignment.IsDeleted,
+                DeleteDate = assignment.DeleteDate,
+                DeleteName = assignment.DeleteName
+            };
+
+            return CreatedAtAction(nameof(GetById), new { adviserAssignmentId = assignment.Id }, response);
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] AdviserAssignment assignment)
+        [HttpPut("{adviserAssignmentId:int}")]
+        public async Task<IActionResult> Update(int adviserAssignmentId, [FromBody] UpsertAdviserAssignmentRequest request)
         {
-            if (id != assignment.Id) return BadRequest();
-            var existing = await _context.AdviserAssignments.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var existing = await _context.AdviserAssignments.FirstOrDefaultAsync(x => x.Id == adviserAssignmentId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
-            existing.AdviserId = assignment.AdviserId;
-            existing.YearLevelId = assignment.YearLevelId;
-            existing.AssignedAt = assignment.AssignedAt;
+            existing.AdviserId = request.AdviserId;
+            existing.YearLevelId = request.YearLevelId;
+            existing.AssignedAt = request.AssignedAt;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{adviserAssignmentId:int}")]
+        public async Task<IActionResult> Delete(int adviserAssignmentId)
         {
-            var assignment = await _context.AdviserAssignments.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var assignment = await _context.AdviserAssignments.FirstOrDefaultAsync(x => x.Id == adviserAssignmentId && !x.IsDeleted);
             if (assignment == null) return NotFound();
 
             assignment.IsDeleted = true;

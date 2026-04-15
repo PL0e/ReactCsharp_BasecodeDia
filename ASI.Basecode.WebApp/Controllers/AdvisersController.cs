@@ -1,11 +1,11 @@
 using ASI.Basecode.Data;
 using ASI.Basecode.Data.Models;
+using ASI.Basecode.WebApp.Models.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -33,50 +33,48 @@ namespace ASI.Basecode.WebApp.Controllers
                     _context.Users.AsNoTracking().Where(u => u.IsActive),
                     adviser => adviser.UserId,
                     user => user.Id,
-                    (adviser, user) => new
+                    (adviser, user) => new AdviserResponse
                     {
-                        adviserId = adviser.Id,
-                        id = adviser.Id,
-                        userId = adviser.UserId,
-                        username = user.Username,
-                        firstName = user.FirstName,
-                        lastName = user.LastName,
-                        fullName = $"{user.FirstName} {user.LastName}".Trim(),
-                        name = $"{user.FirstName} {user.LastName}".Trim(),
-                        email = user.Username,
-                        isDeleted = adviser.IsDeleted,
-                        deleteDate = adviser.DeleteDate,
-                        deleteName = adviser.DeleteName
+                        AdviserId = adviser.Id,
+                        UserId = adviser.UserId,
+                        Username = user.Username,
+                        FirstName = user.FirstName,
+                        LastName = user.LastName,
+                        FullName = $"{user.FirstName} {user.LastName}".Trim(),
+                        Name = $"{user.FirstName} {user.LastName}".Trim(),
+                        Email = user.Username,
+                        IsDeleted = adviser.IsDeleted,
+                        DeleteDate = adviser.DeleteDate,
+                        DeleteName = adviser.DeleteName
                     })
                 .ToListAsync();
 
             return Ok(advisers);
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetById(int id)
+        [HttpGet("{adviserId:int}")]
+        public async Task<IActionResult> GetById(int adviserId)
         {
             var adviser = await _context.Advisers
                 .AsNoTracking()
-                .Where(a => a.Id == id && !a.IsDeleted)
+                .Where(a => a.Id == adviserId && !a.IsDeleted)
                 .Join(
                     _context.Users.AsNoTracking().Where(u => u.IsActive),
                     a => a.UserId,
                     u => u.Id,
-                    (a, u) => new
+                    (a, u) => new AdviserResponse
                     {
-                        adviserId = a.Id,
-                        id = a.Id,
-                        userId = a.UserId,
-                        username = u.Username,
-                        firstName = u.FirstName,
-                        lastName = u.LastName,
-                        fullName = $"{u.FirstName} {u.LastName}".Trim(),
-                        name = $"{u.FirstName} {u.LastName}".Trim(),
-                        email = u.Username,
-                        isDeleted = a.IsDeleted,
-                        deleteDate = a.DeleteDate,
-                        deleteName = a.DeleteName
+                        AdviserId = a.Id,
+                        UserId = a.UserId,
+                        Username = u.Username,
+                        FirstName = u.FirstName,
+                        LastName = u.LastName,
+                        FullName = $"{u.FirstName} {u.LastName}".Trim(),
+                        Name = $"{u.FirstName} {u.LastName}".Trim(),
+                        Email = u.Username,
+                        IsDeleted = a.IsDeleted,
+                        DeleteDate = a.DeleteDate,
+                        DeleteName = a.DeleteName
                     })
                 .FirstOrDefaultAsync();
 
@@ -85,33 +83,60 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Adviser>> Create([FromBody] Adviser adviser)
+        public async Task<ActionResult<AdviserResponse>> Create([FromBody] UpsertAdviserRequest request)
         {
-            adviser.IsDeleted = false;
-            adviser.DeleteDate = null;
-            adviser.DeleteName = null;
+            var adviser = new Adviser
+            {
+                UserId = request.UserId,
+                IsDeleted = false,
+                DeleteDate = null,
+                DeleteName = null
+            };
+
             _context.Advisers.Add(adviser);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = adviser.Id }, adviser);
+
+            var response = await _context.Advisers.AsNoTracking()
+                .Where(a => a.Id == adviser.Id)
+                .Join(
+                    _context.Users.AsNoTracking(),
+                    a => a.UserId,
+                    u => u.Id,
+                    (a, u) => new AdviserResponse
+                    {
+                        AdviserId = a.Id,
+                        UserId = a.UserId,
+                        Username = u.Username,
+                        FirstName = u.FirstName,
+                        LastName = u.LastName,
+                        FullName = $"{u.FirstName} {u.LastName}".Trim(),
+                        Name = $"{u.FirstName} {u.LastName}".Trim(),
+                        Email = u.Username,
+                        IsDeleted = a.IsDeleted,
+                        DeleteDate = a.DeleteDate,
+                        DeleteName = a.DeleteName
+                    })
+                .FirstOrDefaultAsync();
+
+            return CreatedAtAction(nameof(GetById), new { adviserId = adviser.Id }, response);
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Adviser adviser)
+        [HttpPut("{adviserId:int}")]
+        public async Task<IActionResult> Update(int adviserId, [FromBody] UpsertAdviserRequest request)
         {
-            if (id != adviser.Id) return BadRequest();
-            var existing = await _context.Advisers.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var existing = await _context.Advisers.FirstOrDefaultAsync(x => x.Id == adviserId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
-            existing.UserId = adviser.UserId;
+            existing.UserId = request.UserId;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{adviserId:int}")]
+        public async Task<IActionResult> Delete(int adviserId)
         {
-            var adviser = await _context.Advisers.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var adviser = await _context.Advisers.FirstOrDefaultAsync(x => x.Id == adviserId && !x.IsDeleted);
             if (adviser == null) return NotFound();
 
             adviser.IsDeleted = true;
