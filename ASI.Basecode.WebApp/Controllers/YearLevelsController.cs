@@ -29,10 +29,10 @@ namespace ASI.Basecode.WebApp.Controllers
             return Ok(await _context.YearLevels.AsNoTracking().Where(x => !x.IsDeleted).ToListAsync());
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<ActionResult<YearLevel>> GetById(int id)
+        [HttpGet("{yearLevelId:int}")]
+        public async Task<ActionResult<YearLevel>> GetById(int yearLevelId)
         {
-            var yearLevel = await _context.YearLevels.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var yearLevel = await _context.YearLevels.AsNoTracking().FirstOrDefaultAsync(x => x.Id == yearLevelId && !x.IsDeleted);
             if (yearLevel == null) return NotFound();
             return Ok(yearLevel);
         }
@@ -45,14 +45,14 @@ namespace ASI.Basecode.WebApp.Controllers
             yearLevel.DeleteName = null;
             _context.YearLevels.Add(yearLevel);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = yearLevel.Id }, yearLevel);
+            return CreatedAtAction(nameof(GetById), new { yearLevelId = yearLevel.Id }, yearLevel);
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] YearLevel yearLevel)
+        [HttpPut("{yearLevelId:int}")]
+        public async Task<IActionResult> Update(int yearLevelId, [FromBody] YearLevel yearLevel)
         {
-            if (id != yearLevel.Id) return BadRequest();
-            var existing = await _context.YearLevels.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            if (yearLevelId != yearLevel.Id) return BadRequest();
+            var existing = await _context.YearLevels.FirstOrDefaultAsync(x => x.Id == yearLevelId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
             existing.YearName = yearLevel.YearName;
@@ -61,10 +61,10 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{yearLevelId:int}")]
+        public async Task<IActionResult> Delete(int yearLevelId)
         {
-            var yearLevel = await _context.YearLevels.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var yearLevel = await _context.YearLevels.FirstOrDefaultAsync(x => x.Id == yearLevelId && !x.IsDeleted);
             if (yearLevel == null) return NotFound();
 
             yearLevel.IsDeleted = true;

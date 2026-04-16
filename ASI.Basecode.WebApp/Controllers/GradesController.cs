@@ -29,10 +29,10 @@ namespace ASI.Basecode.WebApp.Controllers
             return Ok(await _context.Grades.AsNoTracking().Where(x => !x.IsDeleted).ToListAsync());
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<ActionResult<Grade>> GetById(int id)
+        [HttpGet("{gradeId:int}")]
+        public async Task<ActionResult<Grade>> GetById(int gradeId)
         {
-            var grade = await _context.Grades.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var grade = await _context.Grades.AsNoTracking().FirstOrDefaultAsync(x => x.Id == gradeId && !x.IsDeleted);
             if (grade == null) return NotFound();
             return Ok(grade);
         }
@@ -45,14 +45,14 @@ namespace ASI.Basecode.WebApp.Controllers
             grade.DeleteName = null;
             _context.Grades.Add(grade);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = grade.Id }, grade);
+            return CreatedAtAction(nameof(GetById), new { gradeId = grade.Id }, grade);
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Grade grade)
+        [HttpPut("{gradeId:int}")]
+        public async Task<IActionResult> Update(int gradeId, [FromBody] Grade grade)
         {
-            if (id != grade.Id) return BadRequest();
-            var existing = await _context.Grades.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            if (gradeId != grade.Id) return BadRequest();
+            var existing = await _context.Grades.FirstOrDefaultAsync(x => x.Id == gradeId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
             existing.StudentId = grade.StudentId;
@@ -66,10 +66,10 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{gradeId:int}")]
+        public async Task<IActionResult> Delete(int gradeId)
         {
-            var grade = await _context.Grades.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var grade = await _context.Grades.FirstOrDefaultAsync(x => x.Id == gradeId && !x.IsDeleted);
             if (grade == null) return NotFound();
 
             grade.IsDeleted = true;

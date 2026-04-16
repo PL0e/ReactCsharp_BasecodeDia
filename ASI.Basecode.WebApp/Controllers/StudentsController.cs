@@ -29,10 +29,10 @@ namespace ASI.Basecode.WebApp.Controllers
             return Ok(await _context.Students.AsNoTracking().Where(x => !x.IsDeleted).ToListAsync());
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<ActionResult<Student>> GetById(int id)
+        [HttpGet("{studentId:int}")]
+        public async Task<ActionResult<Student>> GetById(int studentId)
         {
-            var student = await _context.Students.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var student = await _context.Students.AsNoTracking().FirstOrDefaultAsync(x => x.Id == studentId && !x.IsDeleted);
             if (student == null) return NotFound();
             return Ok(student);
         }
@@ -45,14 +45,14 @@ namespace ASI.Basecode.WebApp.Controllers
             student.DeleteName = null;
             _context.Students.Add(student);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = student.Id }, student);
+            return CreatedAtAction(nameof(GetById), new { studentId = student.Id }, student);
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Student student)
+        [HttpPut("{studentId:int}")]
+        public async Task<IActionResult> Update(int studentId, [FromBody] Student student)
         {
-            if (id != student.Id) return BadRequest();
-            var existing = await _context.Students.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            if (studentId != student.Id) return BadRequest();
+            var existing = await _context.Students.FirstOrDefaultAsync(x => x.Id == studentId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
             existing.UserId = student.UserId;
@@ -62,10 +62,10 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{studentId:int}")]
+        public async Task<IActionResult> Delete(int studentId)
         {
-            var student = await _context.Students.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var student = await _context.Students.FirstOrDefaultAsync(x => x.Id == studentId && !x.IsDeleted);
             if (student == null) return NotFound();
 
             student.IsDeleted = true;

@@ -29,10 +29,10 @@ namespace ASI.Basecode.WebApp.Controllers
             return Ok(await _context.Courses.AsNoTracking().Where(x => !x.IsDeleted).ToListAsync());
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<ActionResult<Course>> GetById(int id)
+        [HttpGet("{courseId:int}")]
+        public async Task<ActionResult<Course>> GetById(int courseId)
         {
-            var course = await _context.Courses.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var course = await _context.Courses.AsNoTracking().FirstOrDefaultAsync(x => x.Id == courseId && !x.IsDeleted);
             if (course == null) return NotFound();
             return Ok(course);
         }
@@ -45,14 +45,14 @@ namespace ASI.Basecode.WebApp.Controllers
             course.DeleteName = null;
             _context.Courses.Add(course);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = course.Id }, course);
+            return CreatedAtAction(nameof(GetById), new { courseId = course.Id }, course);
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Course course)
+        [HttpPut("{courseId:int}")]
+        public async Task<IActionResult> Update(int courseId, [FromBody] Course course)
         {
-            if (id != course.Id) return BadRequest();
-            var existing = await _context.Courses.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            if (courseId != course.Id) return BadRequest();
+            var existing = await _context.Courses.FirstOrDefaultAsync(x => x.Id == courseId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
             existing.CourseCode = course.CourseCode;
@@ -63,10 +63,10 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{courseId:int}")]
+        public async Task<IActionResult> Delete(int courseId)
         {
-            var course = await _context.Courses.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            var course = await _context.Courses.FirstOrDefaultAsync(x => x.Id == courseId && !x.IsDeleted);
             if (course == null) return NotFound();
 
             course.IsDeleted = true;
