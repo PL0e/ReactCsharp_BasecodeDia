@@ -4,6 +4,7 @@ using ASI.Basecode.Services.Manager;
 using ASI.Basecode.WebApp.Authentication;
 using ASI.Basecode.WebApp.Extensions.Configuration;
 using ASI.Basecode.WebApp.Models;
+using ASI.Basecode.WebApp.Models.Auth;
 using ASI.Basecode.WebApp.Mvc;
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
@@ -22,6 +23,7 @@ using static ASI.Basecode.Resources.Constants.Enums;
 
 namespace ASI.Basecode.WebApp.Controllers
 {
+    [ApiController]
     [Route("api/[controller]/[action]")]
     public class AccountController : ControllerBase<AccountController>
     {
@@ -56,27 +58,30 @@ namespace ASI.Basecode.WebApp.Controllers
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
-        public IActionResult Login([FromBody] LoginViewModel model)
+        [ProducesResponseType(typeof(ApiResult<LoginUser>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<LoginUser>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResult<LoginUser>), StatusCodes.Status401Unauthorized)]
+        public ActionResult<ApiResult<LoginUser>> Login([FromBody] LoginViewModel model)
         {
             if (model == null
                 || string.IsNullOrWhiteSpace(model.UserId)
                 || string.IsNullOrWhiteSpace(model.Password))
             {
-                return BadRequest(ApiResult<object>.CreateError("UserId and Password are required."));
+                return BadRequest(ApiResult<LoginUser>.CreateError("UserId and Password are required."));
             }
 
             User user = null;
             var loginResult = _userService.AuthenticateUser(model.UserId, model.Password, ref user);
 
             if (loginResult == LoginResult.Failed)
-                return Unauthorized(ApiResult<object>.CreateError("Invalid ID or password."));
+                return Unauthorized(ApiResult<LoginUser>.CreateError("Invalid ID or password."));
 
             // Role comes directly from the database record
             string role = user.Role;
 
             if (string.IsNullOrWhiteSpace(role))
             {
-                return Unauthorized(ApiResult<object>.CreateError("User account has no assigned role."));
+                return Unauthorized(ApiResult<LoginUser>.CreateError("User account has no assigned role."));
             }
 
             var identity = _signInManager.CreateClaimsIdentity(user);
@@ -100,7 +105,7 @@ namespace ASI.Basecode.WebApp.Controllers
                 message = "Login successful."
             };
 
-            return Ok(ApiResult<object>.CreateSuccess(response, "Login successful."));
+            return Ok(ApiResult<LoginUser>.CreateSuccess(response, "Login successful."));
         }
 
         /// <summary>
@@ -109,31 +114,35 @@ namespace ASI.Basecode.WebApp.Controllers
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
-        public IActionResult Register([FromBody] RegisterViewModel model)
+        [ProducesResponseType(typeof(ApiResult<RegisterSuccessResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResult<RegisterSuccessResponse>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResult<RegisterSuccessResponse>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ApiResult<RegisterSuccessResponse>), StatusCodes.Status500InternalServerError)]
+        public ActionResult<ApiResult<RegisterSuccessResponse>> Register([FromBody] RegisterViewModel model)
         {
             if (model == null)
             {
-                return BadRequest(ApiResult<object>.CreateError("Request body is required."));
+                return BadRequest(ApiResult<RegisterSuccessResponse>.CreateError("Request body is required."));
             }
 
             if (!ModelState.IsValid)
             {
-                return BadRequest(ApiResult<object>.CreateError("Invalid registration data."));
+                return BadRequest(ApiResult<RegisterSuccessResponse>.CreateError("Invalid registration data."));
             }
 
             if (!Regex.IsMatch(model.UserId, "^(10|20|30)\\d{8}$"))
             {
-                return BadRequest(ApiResult<object>.CreateError("UserId must be 10 digits and start with 10, 20, or 30."));
+                return BadRequest(ApiResult<RegisterSuccessResponse>.CreateError("UserId must be 10 digits and start with 10, 20, or 30."));
             }
 
             if (!Regex.IsMatch(model.Password, "^(?=.*[A-Za-z])(?=.*\\d).{8,}$"))
             {
-                return BadRequest(ApiResult<object>.CreateError("Password must be at least 8 characters and include both letters and numbers."));
+                return BadRequest(ApiResult<RegisterSuccessResponse>.CreateError("Password must be at least 8 characters and include both letters and numbers."));
             }
 
             if (_userService.UserExists(model.UserId))
             {
-                return Conflict(ApiResult<object>.CreateError("User ID already exists."));
+                return Conflict(ApiResult<RegisterSuccessResponse>.CreateError("User ID already exists."));
             }
 
             try
@@ -143,13 +152,13 @@ namespace ASI.Basecode.WebApp.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error registering user {UserId}", model.UserId);
-                return StatusCode(500, ApiResult<object>.CreateError("Registration failed due to a server error. Please try again."));
+                return StatusCode(500, ApiResult<RegisterSuccessResponse>.CreateError("Registration failed due to a server error. Please try again."));
             }
 
-            return Ok(ApiResult<object>.CreateSuccess(new
+            return Ok(ApiResult<RegisterSuccessResponse>.CreateSuccess(new RegisterSuccessResponse
             {
-                userId = model.UserId,
-                name = model.Name.Trim()
+                UserId = model.UserId,
+                Name = model.Name.Trim()
             }, "Account created successfully."));
         }
 
@@ -159,10 +168,11 @@ namespace ASI.Basecode.WebApp.Controllers
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
-        public async Task<IActionResult> Logout()
+        [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResult<string>>> Logout()
         {
             await _signInManager.SignOutAsync();
-            return Ok(ApiResult<object>.CreateSuccess("Signed out successfully."));
+            return Ok(ApiResult<string>.CreateSuccess("Signed out successfully.", "Signed out successfully."));
         }
     }
 }

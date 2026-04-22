@@ -3,6 +3,7 @@ using ASI.Basecode.Data.Models;
 using ASI.Basecode.WebApp.Models.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -24,7 +25,8 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        [ProducesResponseType(typeof(System.Collections.Generic.IEnumerable<AdviserResponse>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<System.Collections.Generic.IEnumerable<AdviserResponse>>> GetAll()
         {
             var advisers = await _context.Advisers
                 .AsNoTracking()
@@ -53,7 +55,9 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpGet("{adviserId:int}")]
-        public async Task<IActionResult> GetById(int adviserId)
+        [ProducesResponseType(typeof(AdviserResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<AdviserResponse>> GetById(int adviserId)
         {
             var adviser = await _context.Advisers
                 .AsNoTracking()
@@ -147,7 +151,8 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpGet("directory")]
-        public async Task<IActionResult> GetAdviserDirectory()
+        [ProducesResponseType(typeof(System.Collections.Generic.IEnumerable<AdviserDirectoryResponse>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<System.Collections.Generic.IEnumerable<AdviserDirectoryResponse>>> GetAdviserDirectory()
         {
             var advisers = await _context.Advisers
                 .AsNoTracking()
@@ -156,14 +161,14 @@ namespace ASI.Basecode.WebApp.Controllers
                     _context.Users.AsNoTracking().Where(u => u.IsActive && u.Role == "ADVISER"),
                     adviser => adviser.UserId,
                     user => user.Id,
-                    (adviser, user) => new
+                    (adviser, user) => new AdviserDirectoryResponse
                     {
-                        adviserId = adviser.Id,
-                        userId = user.Id,
-                        username = user.Username,
-                        firstName = user.FirstName,
-                        lastName = user.LastName,
-                        role = user.Role
+                        AdviserId = adviser.Id,
+                        UserId = user.Id,
+                        Username = user.Username,
+                        FirstName = user.FirstName,
+                        LastName = user.LastName,
+                        Role = user.Role
                     })
                 .ToListAsync();
 

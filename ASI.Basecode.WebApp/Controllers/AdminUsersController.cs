@@ -1,8 +1,10 @@
 using ASI.Basecode.Data;
 using ASI.Basecode.Data.Models;
 using ASI.Basecode.WebApp.Models.Admin;
+using ASI.Basecode.WebApp.Models.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -24,20 +26,21 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        [ProducesResponseType(typeof(System.Collections.Generic.IEnumerable<AdminUserResponse>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<System.Collections.Generic.IEnumerable<AdminUserResponse>>> GetAll()
         {
             var users = await _context.Users.AsNoTracking()
                 .OrderBy(x => x.Username)
-                .Select(x => new
+                .Select(x => new AdminUserResponse
                 {
-                    userId = x.Id,
-                    username = x.Username,
-                    firstName = x.FirstName,
-                    lastName = x.LastName,
-                    role = x.Role,
-                    isFirstLogin = x.IsFirstLogin,
-                    isActive = x.IsActive,
-                    createdAt = x.CreatedAt
+                    UserId = x.Id,
+                    Username = x.Username,
+                    FirstName = x.FirstName,
+                    LastName = x.LastName,
+                    Role = x.Role,
+                    IsFirstLogin = x.IsFirstLogin,
+                    IsActive = x.IsActive,
+                    CreatedAt = x.CreatedAt
                 })
                 .ToListAsync();
 
@@ -45,27 +48,41 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateUserRequest request)
+        [ProducesResponseType(typeof(CreateAdminUserResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
+        public async Task<ActionResult<CreateAdminUserResponse>> Create([FromBody] CreateUserRequest request)
         {
             if (request == null || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Role))
             {
-                return BadRequest(new { message = "Username and role are required." });
+                return BadRequest(new MessageResponse { Message = "Username and role are required." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest(new MessageResponse { Message = "Email is required." });
             }
 
             var role = request.Role.Trim().ToUpperInvariant();
             if (!IsAllowedRole(role))
             {
-                return BadRequest(new { message = "Invalid role." });
+                return BadRequest(new MessageResponse { Message = "Invalid role." });
             }
 
             if (await _context.Users.AnyAsync(x => x.Username == request.Username))
             {
-                return Conflict(new { message = "Username already exists." });
+                return Conflict(new MessageResponse { Message = "Username already exists." });
+            }
+
+            if (await _context.Users.AnyAsync(x => x.Email == request.Email))
+            {
+                return Conflict(new MessageResponse { Message = "Email already exists." });
             }
 
             var user = new User
             {
                 Username = request.Username.Trim(),
+                Email = request.Email.Trim(),
                 Password = null,
                 Role = role,
                 FirstName = request.FirstName?.Trim(),
@@ -81,28 +98,30 @@ namespace ASI.Basecode.WebApp.Controllers
             await EnsureRoleProfileAsync(user, request.YearLevelId);
             await _context.SaveChangesAsync();
 
-            return Ok(new
+            return Ok(new CreateAdminUserResponse
             {
-                message = "User pre-registered successfully.",
-                userId = user.Id,
-                username = user.Username,
-                role = user.Role,
-                isFirstLogin = user.IsFirstLogin
+                Message = "User pre-registered successfully.",
+                UserId = user.Id,
+                Username = user.Username,
+                Role = user.Role,
+                IsFirstLogin = user.IsFirstLogin
             });
         }
 
         [HttpDelete("{userId:int}")]
-        public async Task<IActionResult> Delete(int userId)
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<MessageResponse>> Delete(int userId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(x => x.Id == userId);
             if (user == null)
             {
-                return NotFound(new { message = "User not found." });
+                return NotFound(new MessageResponse { Message = "User not found." });
             }
 
             user.IsActive = false;
             await _context.SaveChangesAsync();
-            return Ok(new { message = "User deactivated successfully." });
+            return Ok(new MessageResponse { Message = "User deactivated successfully." });
         }
 
         private async Task EnsureRoleProfileAsync(User user, int? yearLevelId)

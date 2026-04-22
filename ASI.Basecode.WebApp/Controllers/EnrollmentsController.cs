@@ -14,6 +14,7 @@ namespace ASI.Basecode.WebApp.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class EnrollmentsController : ControllerBase
     {
         private readonly AsiBasecodeDBContext _context;
@@ -63,7 +64,6 @@ namespace ASI.Basecode.WebApp.Controllers
             return NoContent();
         }
 
-        [ApiExplorerSettings(IgnoreApi = true)]
         [HttpDelete("{enrollmentId:int}")]
         public async Task<IActionResult> Delete(int enrollmentId)
         {

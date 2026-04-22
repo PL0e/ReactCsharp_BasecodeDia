@@ -3,11 +3,13 @@ using ASI.Basecode.Data.Models;
 using ASI.Basecode.WebApp.Models.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace ASI.Basecode.WebApp.Controllers
@@ -49,6 +51,76 @@ namespace ASI.Basecode.WebApp.Controllers
                 .ToListAsync();
 
             return Ok(appointments);
+        }
+
+        [HttpGet("calendar")]
+        [ProducesResponseType(typeof(AppointmentCalendarResponse), StatusCodes.Status200OK)]
+        public async Task<ActionResult<AppointmentCalendarResponse>> GetCalendar()
+        {
+            var currentRole = User?.FindFirst(ClaimTypes.Role)?.Value?.ToUpperInvariant();
+            var isAdviserScoped = currentRole == "ADVISER" || currentRole == "CHAIRMAN";
+
+            var scopedYearLevelIds = new List<int>();
+            if (isAdviserScoped)
+            {
+                scopedYearLevelIds = await GetAssignedYearLevelIdsForCurrentAdviserAsync();
+                if (scopedYearLevelIds.Count == 0)
+                {
+                    return Ok(new AppointmentCalendarResponse());
+                }
+            }
+
+            var items = await (
+                from appointment in _context.Appointments.AsNoTracking()
+                join student in _context.Students.AsNoTracking() on appointment.StudentId equals student.Id into studentJoin
+                from student in studentJoin.DefaultIfEmpty()
+                join studentUser in _context.Users.AsNoTracking() on student.UserId equals (int?)studentUser.Id into studentUserJoin
+                from studentUser in studentUserJoin.DefaultIfEmpty()
+                join adviser in _context.Advisers.AsNoTracking() on appointment.AdviserId equals adviser.Id into adviserJoin
+                from adviser in adviserJoin.DefaultIfEmpty()
+                join adviserUser in _context.Users.AsNoTracking() on adviser.UserId equals (int?)adviserUser.Id into adviserUserJoin
+                from adviserUser in adviserUserJoin.DefaultIfEmpty()
+                where !appointment.IsDeleted
+                      && (!isAdviserScoped || (student.YearLevelId.HasValue && scopedYearLevelIds.Contains(student.YearLevelId.Value)))
+                orderby appointment.AppointmentDate, appointment.AppointmentTime
+                select new AppointmentCalendarItemResponse
+                {
+                    AppointmentId = appointment.Id,
+                    StudentId = appointment.StudentId,
+                    StudentName = studentUser == null
+                        ? null
+                        : (string.IsNullOrWhiteSpace(studentUser.FirstName) && string.IsNullOrWhiteSpace(studentUser.LastName)
+                            ? studentUser.Username
+                            : ($"{studentUser.FirstName} {studentUser.LastName}".Trim())),
+                    AdviserId = appointment.AdviserId,
+                    AdviserName = adviserUser == null
+                        ? null
+                        : (string.IsNullOrWhiteSpace(adviserUser.FirstName) && string.IsNullOrWhiteSpace(adviserUser.LastName)
+                            ? adviserUser.Username
+                            : ($"{adviserUser.FirstName} {adviserUser.LastName}".Trim())),
+                    SemesterId = appointment.SemesterId,
+                    AppointmentType = appointment.AppointmentType,
+                    AppointmentDate = appointment.AppointmentDate,
+                    AppointmentTime = appointment.AppointmentTime,
+                    Status = appointment.Status,
+                    CancellationReason = appointment.CancellationReason
+                })
+                .ToListAsync();
+
+            var response = new AppointmentCalendarResponse
+            {
+                UpcomingAppointments = items
+                    .Where(x => !IsCompletedStatus(x.Status) && !IsCancelledStatus(x.Status))
+                    .ToList(),
+                CompletedAppointments = items
+                    .Where(x => IsCompletedStatus(x.Status))
+                    .ToList(),
+                CancelledAppointments = items
+                    .Where(x => IsCancelledStatus(x.Status))
+                    .ToList()
+            };
+
+            return Ok(response);
         }
 
         [HttpGet("{appointmentId:int}")]
@@ -153,6 +225,49 @@ namespace ASI.Basecode.WebApp.Controllers
             appointment.DeleteName = User?.Identity?.Name ?? User?.FindFirst("UserName")?.Value ?? "system";
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        private static bool IsCompletedStatus(string status)
+        {
+            return string.Equals(status, "COMPLETED", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsCancelledStatus(string status)
+        {
+            return string.Equals(status, "CANCELLED", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "CANCELED", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<List<int>> GetAssignedYearLevelIdsForCurrentAdviserAsync()
+        {
+            var username = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? User?.Identity?.Name
+                           ?? User?.FindFirst("UserName")?.Value;
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return new List<int>();
+            }
+
+            var user = await _context.Users.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Username == username && x.IsActive);
+            if (user == null)
+            {
+                return new List<int>();
+            }
+
+            var adviser = await _context.Advisers.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.UserId == user.Id && !x.IsDeleted);
+            if (adviser == null)
+            {
+                return new List<int>();
+            }
+
+            return await _context.AdviserAssignments.AsNoTracking()
+                .Where(x => x.AdviserId == adviser.Id && !x.IsDeleted)
+                .Select(x => x.YearLevelId)
+                .Distinct()
+                .ToListAsync();
         }
     }
 }

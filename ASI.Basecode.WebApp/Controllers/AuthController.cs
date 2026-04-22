@@ -3,6 +3,7 @@ using ASI.Basecode.Data.Models;
 using ASI.Basecode.Services.Manager;
 using ASI.Basecode.WebApp.Authentication;
 using ASI.Basecode.WebApp.Extensions.Configuration;
+using ASI.Basecode.WebApp.Models.Api;
 using ASI.Basecode.WebApp.Models.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -34,72 +35,6 @@ namespace ASI.Basecode.WebApp.Controllers
             _signInManager = signInManager;
         }
 
-        [HttpPost("first-login/start")]
-        [AllowAnonymous]
-        public async Task<IActionResult> FirstLoginStart([FromBody] FirstLoginStartRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.Username))
-            {
-                return BadRequest(new { message = "Username is required." });
-            }
-
-            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Username == request.Username);
-            if (user == null || !user.IsActive)
-            {
-                return NotFound(new { message = "User not found." });
-            }
-
-            return Ok(new
-            {
-                requiresPasswordSetup = user.IsFirstLogin || string.IsNullOrWhiteSpace(user.Password),
-                user = new
-                {
-                    userId = user.Id,
-                    username = user.Username,
-                    firstName = user.FirstName,
-                    lastName = user.LastName,
-                    role = user.Role?.ToUpperInvariant()
-                }
-            });
-        }
-
-        [HttpPost("first-login/set-password")]
-        [AllowAnonymous]
-        public async Task<IActionResult> SetPassword([FromBody] SetPasswordRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
-            {
-                return BadRequest(new { message = "Username and password are required." });
-            }
-
-            if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
-            {
-                return BadRequest(new { message = "Password and confirm password do not match." });
-            }
-
-            if (!IsPasswordValid(request.Password))
-            {
-                return BadRequest(new { message = "Password must be at least 6 characters and include uppercase, letter, number, and special character." });
-            }
-
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Username == request.Username && x.IsActive);
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found." });
-            }
-
-            if (!user.IsFirstLogin && !string.IsNullOrWhiteSpace(user.Password))
-            {
-                return Conflict(new { message = "Password has already been set for this account." });
-            }
-
-            user.Password = PasswordManager.EncryptPassword(request.Password);
-            user.IsFirstLogin = false;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Password set successfully." });
-        }
-
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -109,7 +44,10 @@ namespace ASI.Basecode.WebApp.Controllers
                 return BadRequest(new { message = "Username and password are required." });
             }
 
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Username == request.Username && x.IsActive);
+            var loginIdentifier = request.Username.Trim();
+            var user = await _context.Users.FirstOrDefaultAsync(x =>
+                x.IsActive &&
+                (x.Username == loginIdentifier || x.Email == loginIdentifier));
             if (user == null)
             {
                 return Unauthorized(new { message = "Invalid username or password." });
@@ -120,7 +58,7 @@ namespace ASI.Basecode.WebApp.Controllers
                 return StatusCode(StatusCodes.Status428PreconditionRequired, new
                 {
                     requiresPasswordSetup = true,
-                    message = "First login password setup is required."
+                    message = "Please use 'Forgot Password' to set your initial password."
                 });
             }
 
@@ -163,6 +101,71 @@ namespace ASI.Basecode.WebApp.Controllers
                     isActive = user.IsActive
                 }
             });
+        }
+
+        [HttpPost("forgot-password/start")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(ForgotPasswordStartResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ForgotPasswordStartResponse>> ForgotPasswordStart([FromBody] ForgotPasswordStartRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest(new MessageResponse { Message = "Email is required." });
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(x => x.Email == request.Email && x.IsActive);
+            if (user == null)
+            {
+                return NotFound(new MessageResponse { Message = "Email not found or user is not active." });
+            }
+
+            var response = new ForgotPasswordStartResponse
+            {
+                Message = "Email verified. You can proceed to reset your password.",
+                Username = user.Username
+            };
+
+            return Ok(response);
+        }
+
+        [HttpPost("forgot-password/reset")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<MessageResponse>> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                return BadRequest(new MessageResponse { Message = "Email and new password are required." });
+            }
+
+            var identifier = request.Email.Trim();
+
+            if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
+            {
+                return BadRequest(new MessageResponse { Message = "Password and confirm password do not match." });
+            }
+
+            if (!IsPasswordValid(request.NewPassword))
+            {
+                return BadRequest(new MessageResponse { Message = "Password must be at least 6 characters and include uppercase, letter, number, and special character." });
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(x =>
+                x.IsActive &&
+                (x.Email == identifier || x.Username == identifier));
+            if (user == null)
+            {
+                return BadRequest(new MessageResponse { Message = "Email not found or user is not active." });
+            }
+
+            user.Password = PasswordManager.EncryptPassword(request.NewPassword);
+            user.IsFirstLogin = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new MessageResponse { Message = "Password reset successfully." });
         }
 
         private static bool IsPasswordValid(string password)

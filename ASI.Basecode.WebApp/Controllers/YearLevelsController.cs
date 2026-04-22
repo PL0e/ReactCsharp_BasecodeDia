@@ -14,6 +14,7 @@ namespace ASI.Basecode.WebApp.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class YearLevelsController : ControllerBase
     {
         private readonly AsiBasecodeDBContext _context;
@@ -60,7 +61,6 @@ namespace ASI.Basecode.WebApp.Controllers
             return NoContent();
         }
 
-        [ApiExplorerSettings(IgnoreApi = true)]
         [HttpDelete("{yearLevelId:int}")]
         public async Task<IActionResult> Delete(int yearLevelId)
         {
