@@ -1,6 +1,7 @@
 using ASI.Basecode.Data;
 using ASI.Basecode.Data.Models;
 using ASI.Basecode.WebApp.Models.Api;
+using ASI.Basecode.WebApp.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -20,23 +21,25 @@ namespace ASI.Basecode.WebApp.Controllers
     public class StudentsController : ControllerBase
     {
         private readonly AsiBasecodeDBContext _context;
+        private readonly NotificationStreamManager _notificationStreamManager;
         private static readonly HashSet<string> AllowedAvailabilityDays = new(StringComparer.OrdinalIgnoreCase)
         {
             "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"
         };
         private const int AppointmentSessionMinutes = 30;
 
-        public StudentsController(AsiBasecodeDBContext context)
+        public StudentsController(AsiBasecodeDBContext context, NotificationStreamManager notificationStreamManager)
         {
             _context = context;
+            _notificationStreamManager = notificationStreamManager;
         }
 
         [HttpGet]
         [ProducesResponseType(typeof(IEnumerable<StudentSummaryResponse>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<IEnumerable<StudentSummaryResponse>>> GetAll()
+        public async Task<ActionResult<IEnumerable<StudentSummaryResponse>>> GetAll([FromQuery] int? yearLevelId = null)
         {
             var currentRole = User?.FindFirst(ClaimTypes.Role)?.Value?.ToUpperInvariant();
-            var isAdviserScoped = currentRole == "ADVISER" || currentRole == "CHAIRMAN";
+            var isAdviserScoped = currentRole == "ADVISER";
 
             var scopedYearLevelIds = new List<int>();
             if (isAdviserScoped)
@@ -52,6 +55,7 @@ namespace ASI.Basecode.WebApp.Controllers
                 from s in _context.Students.AsNoTracking()
                 where !s.IsDeleted
                     && (!isAdviserScoped || (s.YearLevelId.HasValue && scopedYearLevelIds.Contains(s.YearLevelId.Value)))
+                    && (!yearLevelId.HasValue || s.YearLevelId == yearLevelId.Value)
                 join y in _context.YearLevels.AsNoTracking() on s.YearLevelId equals (int?)y.Id into yearLevels
                 from y in yearLevels.DefaultIfEmpty()
                 join u in _context.Users.AsNoTracking().Where(x => x.IsActive && x.Role == "STUDENT") on s.UserId equals (int?)u.Id into users
@@ -60,6 +64,7 @@ namespace ASI.Basecode.WebApp.Controllers
                 {
                     StudentId = s.Id,
                     UserId = s.UserId,
+                    Username = u != null ? u.Username : null,
                     FirstName = u != null ? u.FirstName : null,
                     LastName = u != null ? u.LastName : null,
                     Email = u != null ? u.Email : null,
@@ -77,7 +82,7 @@ namespace ASI.Basecode.WebApp.Controllers
         public async Task<ActionResult<StudentSummaryResponse>> GetById(int studentId)
         {
             var currentRole = User?.FindFirst(ClaimTypes.Role)?.Value?.ToUpperInvariant();
-            var isAdviserScoped = currentRole == "ADVISER" || currentRole == "CHAIRMAN";
+            var isAdviserScoped = currentRole == "ADVISER";
 
             var scopedYearLevelIds = new List<int>();
             if (isAdviserScoped)
@@ -101,6 +106,7 @@ namespace ASI.Basecode.WebApp.Controllers
                 {
                     StudentId = s.Id,
                     UserId = s.UserId,
+                    Username = u != null ? u.Username : null,
                     FirstName = u != null ? u.FirstName : null,
                     LastName = u != null ? u.LastName : null,
                     Email = u != null ? u.Email : null,
@@ -514,6 +520,8 @@ namespace ASI.Basecode.WebApp.Controllers
             _context.Grades.Add(grade);
             await _context.SaveChangesAsync();
 
+            await PublishFailedGradeReminderAsync(grade);
+
             return CreatedAtAction(nameof(GetStudentGradeById), new { studentId, gradeId = grade.Id }, grade);
         }
 
@@ -529,6 +537,8 @@ namespace ASI.Basecode.WebApp.Controllers
             existing.Units = grade.Units;
             existing.NumberOfTakes = grade.NumberOfTakes;
             await _context.SaveChangesAsync();
+
+            await PublishFailedGradeReminderAsync(existing);
             return NoContent();
         }
 
@@ -544,6 +554,45 @@ namespace ASI.Basecode.WebApp.Controllers
             existing.DeleteName = User?.Identity?.Name ?? User?.FindFirst("UserName")?.Value ?? "system";
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        private async Task PublishFailedGradeReminderAsync(Grade grade)
+        {
+            if (!grade.GradeValue.HasValue || grade.GradeValue.Value < 5m)
+            {
+                return;
+            }
+
+            var student = await _context.Students.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == grade.StudentId && !x.IsDeleted);
+            if (student == null || !student.YearLevelId.HasValue)
+            {
+                return;
+            }
+
+            var studentName = await _context.Users.AsNoTracking()
+                .Where(x => x.Id == student.UserId && x.IsActive)
+                .Select(x => string.IsNullOrWhiteSpace((x.FirstName + " " + x.LastName).Trim())
+                    ? x.Username
+                    : (x.FirstName + " " + x.LastName).Trim())
+                .FirstOrDefaultAsync();
+
+            await _notificationStreamManager.PublishAsync(
+                new NotificationPayload
+                {
+                    Id = grade.Id.ToString(),
+                    Type = "warning",
+                    Title = "Failing grade recorded",
+                    Message = string.IsNullOrWhiteSpace(studentName)
+                        ? "A failing grade was recorded."
+                        : $"A failing grade was recorded for {studentName}.",
+                    CreatedAt = DateTime.UtcNow,
+                    Action = new NotificationActionResponse
+                    {
+                        Kind = "students"
+                    }
+                },
+                new NotificationAudience { YearLevelId = student.YearLevelId.Value });
         }
 
         private async Task<List<int>> GetAssignedYearLevelIdsForCurrentAdviserAsync()

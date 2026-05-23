@@ -158,7 +158,7 @@ namespace ASI.Basecode.WebApp.Controllers
                 .AsNoTracking()
                 .Where(a => !a.IsDeleted)
                 .Join(
-                    _context.Users.AsNoTracking().Where(u => u.IsActive && u.Role == "ADVISER"),
+                    _context.Users.AsNoTracking().Where(u => u.IsActive && IsAdviserAccount(u.Role)),
                     adviser => adviser.UserId,
                     user => user.Id,
                     (adviser, user) => new AdviserDirectoryResponse
@@ -173,6 +173,12 @@ namespace ASI.Basecode.WebApp.Controllers
                 .ToListAsync();
 
             return Ok(advisers);
+        }
+
+        private static bool IsAdviserAccount(string role)
+        {
+            return string.Equals(role, "ADVISER", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "CHAIRMAN", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

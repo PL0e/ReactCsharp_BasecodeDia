@@ -4,6 +4,7 @@ namespace ASI.Basecode.WebApp.Models.Api
     {
         public int StudentId { get; set; }
         public int? UserId { get; set; }
+        public string Username { get; set; }
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Email { get; set; }
@@ -23,7 +24,7 @@ namespace ASI.Basecode.WebApp.Models.Api
         public string SemesterName { get; set; }
         public string SchoolYear { get; set; }
         public string Status { get; set; }
-        public string CurrentGrade { get; set; }
+        public decimal? CurrentGrade { get; set; }
     }
 
     public class StudentGradeResponse
@@ -36,8 +37,8 @@ namespace ASI.Basecode.WebApp.Models.Api
         public int SemesterId { get; set; }
         public string SemesterName { get; set; }
         public string SchoolYear { get; set; }
-        public string GradeValue { get; set; }
-        public string CurrentGrade { get; set; }
+        public decimal? GradeValue { get; set; }
+        public decimal? CurrentGrade { get; set; }
         public int? Units { get; set; }
         public int NumberOfTakes { get; set; }
     }

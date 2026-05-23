@@ -1,5 +1,7 @@
 using ASI.Basecode.Data;
 using ASI.Basecode.Data.Models;
+using ASI.Basecode.WebApp.Models.Api;
+using ASI.Basecode.WebApp.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,10 +20,12 @@ namespace ASI.Basecode.WebApp.Controllers
     public class GradesController : ControllerBase
     {
         private readonly AsiBasecodeDBContext _context;
+        private readonly NotificationStreamManager _notificationStreamManager;
 
-        public GradesController(AsiBasecodeDBContext context)
+        public GradesController(AsiBasecodeDBContext context, NotificationStreamManager notificationStreamManager)
         {
             _context = context;
+            _notificationStreamManager = notificationStreamManager;
         }
 
         [HttpGet]
@@ -46,6 +50,8 @@ namespace ASI.Basecode.WebApp.Controllers
             grade.DeleteName = null;
             _context.Grades.Add(grade);
             await _context.SaveChangesAsync();
+
+            await PublishFailedGradeReminderAsync(grade);
             return CreatedAtAction(nameof(GetById), new { gradeId = grade.Id }, grade);
         }
 
@@ -63,6 +69,8 @@ namespace ASI.Basecode.WebApp.Controllers
             existing.Units = grade.Units;
             existing.NumberOfTakes = grade.NumberOfTakes;
             await _context.SaveChangesAsync();
+
+            await PublishFailedGradeReminderAsync(existing);
             return NoContent();
         }
 
@@ -77,6 +85,45 @@ namespace ASI.Basecode.WebApp.Controllers
             grade.DeleteName = User?.Identity?.Name ?? User?.FindFirst("UserName")?.Value ?? "system";
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        private async Task PublishFailedGradeReminderAsync(Grade grade)
+        {
+            if (!grade.GradeValue.HasValue || grade.GradeValue.Value < 5m)
+            {
+                return;
+            }
+
+            var student = await _context.Students.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == grade.StudentId && !x.IsDeleted);
+            if (student == null || !student.YearLevelId.HasValue)
+            {
+                return;
+            }
+
+            var studentName = await _context.Users.AsNoTracking()
+                .Where(x => x.Id == student.UserId && x.IsActive)
+                .Select(x => string.IsNullOrWhiteSpace((x.FirstName + " " + x.LastName).Trim())
+                    ? x.Username
+                    : (x.FirstName + " " + x.LastName).Trim())
+                .FirstOrDefaultAsync();
+
+            await _notificationStreamManager.PublishAsync(
+                new NotificationPayload
+                {
+                    Id = grade.Id.ToString(),
+                    Type = "warning",
+                    Title = "Failing grade recorded",
+                    Message = string.IsNullOrWhiteSpace(studentName)
+                        ? "A failing grade was recorded."
+                        : $"A failing grade was recorded for {studentName}.",
+                    CreatedAt = DateTime.UtcNow,
+                    Action = new NotificationActionResponse
+                    {
+                        Kind = "students"
+                    }
+                },
+                new NotificationAudience { YearLevelId = student.YearLevelId.Value });
         }
     }
 }

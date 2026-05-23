@@ -1,6 +1,7 @@
 using ASI.Basecode.Data;
 using ASI.Basecode.Data.Models;
 using ASI.Basecode.WebApp.Models.Api;
+using ASI.Basecode.WebApp.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -19,10 +20,12 @@ namespace ASI.Basecode.WebApp.Controllers
     public class AdviserAssignmentsController : ControllerBase
     {
         private readonly AsiBasecodeDBContext _context;
+        private readonly NotificationStreamManager _notificationStreamManager;
 
-        public AdviserAssignmentsController(AsiBasecodeDBContext context)
+        public AdviserAssignmentsController(AsiBasecodeDBContext context, NotificationStreamManager notificationStreamManager)
         {
             _context = context;
+            _notificationStreamManager = notificationStreamManager;
         }
 
         [HttpGet]
@@ -102,6 +105,8 @@ namespace ASI.Basecode.WebApp.Controllers
             _context.AdviserAssignments.Add(assignment);
             await _context.SaveChangesAsync();
 
+            await PublishAssignmentNotificationAsync(assignment, "Adviser assignment created", "success");
+
             var response = new AdviserAssignmentResponse
             {
                 AdviserAssignmentId = assignment.Id,
@@ -129,6 +134,8 @@ namespace ASI.Basecode.WebApp.Controllers
             var existing = await _context.AdviserAssignments.FirstOrDefaultAsync(x => x.Id == adviserAssignmentId && !x.IsDeleted);
             if (existing == null) return NotFound();
 
+            var previousAdviserId = existing.AdviserId;
+
             var adviserExists = await _context.Advisers.AsNoTracking()
                 .AnyAsync(x => x.Id == request.AdviserId);
             if (!adviserExists)
@@ -147,6 +154,8 @@ namespace ASI.Basecode.WebApp.Controllers
             existing.YearLevelId = request.YearLevelId;
             existing.AssignedAt = assignedAt;
             await _context.SaveChangesAsync();
+
+            await PublishAssignmentNotificationAsync(existing, "Adviser assignment updated", "info", previousAdviserId);
             return NoContent();
         }
 
@@ -171,6 +180,58 @@ namespace ASI.Basecode.WebApp.Controllers
             assignment.DeleteName = User?.Identity?.Name ?? User?.FindFirst("UserName")?.Value ?? "system";
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        private async Task PublishAssignmentNotificationAsync(AdviserAssignment assignment, string title, string type, int? previousAdviserId = null)
+        {
+            var adviserName = await _context.Advisers.AsNoTracking()
+                .Where(x => x.Id == assignment.AdviserId && !x.IsDeleted)
+                .Join(_context.Users.AsNoTracking(), adviser => adviser.UserId, user => user.Id,
+                    (adviser, user) => new { user.FirstName, user.LastName, user.Username })
+                .Select(x => string.IsNullOrWhiteSpace((x.FirstName + " " + x.LastName).Trim()) ? x.Username : (x.FirstName + " " + x.LastName).Trim())
+                .FirstOrDefaultAsync();
+
+            var yearLevelName = await _context.YearLevels.AsNoTracking()
+                .Where(x => x.Id == assignment.YearLevelId && !x.IsDeleted)
+                .Select(x => x.YearName)
+                .FirstOrDefaultAsync();
+
+            var message = string.IsNullOrWhiteSpace(adviserName)
+                ? $"{title} for year level {assignment.YearLevelId}."
+                : $"{title}: {adviserName} assigned to {yearLevelName ?? $"year level {assignment.YearLevelId}"}.";
+
+            await _notificationStreamManager.PublishAsync(
+                new NotificationPayload
+                {
+                    Id = assignment.Id.ToString(),
+                    Type = type,
+                    Title = title,
+                    Message = message,
+                    CreatedAt = DateTime.UtcNow,
+                    Action = new NotificationActionResponse
+                    {
+                        Kind = "students"
+                    }
+                },
+                new NotificationAudience { AdviserId = assignment.AdviserId });
+
+            if (previousAdviserId.HasValue && previousAdviserId.Value != assignment.AdviserId)
+            {
+                await _notificationStreamManager.PublishAsync(
+                    new NotificationPayload
+                    {
+                        Id = assignment.Id.ToString(),
+                        Type = "warning",
+                        Title = "Adviser assignment changed",
+                        Message = $"Assignment updated for {yearLevelName ?? $"year level {assignment.YearLevelId}"}.",
+                        CreatedAt = DateTime.UtcNow,
+                        Action = new NotificationActionResponse
+                        {
+                            Kind = "students"
+                        }
+                    },
+                    new NotificationAudience { AdviserId = previousAdviserId.Value });
+            }
         }
     }
 }

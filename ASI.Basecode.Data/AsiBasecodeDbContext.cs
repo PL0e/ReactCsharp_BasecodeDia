@@ -88,6 +88,10 @@ namespace ASI.Basecode.Data
                 entity.Property(e => e.Id).HasColumnName("semesterID");
                 entity.Property(e => e.SemesterName).HasColumnName("semesterName").HasMaxLength(50);
                 entity.Property(e => e.SchoolYear).HasColumnName("schoolYear").HasMaxLength(20);
+                entity.Property(e => e.IsCurrent).HasColumnName("isCurrent").HasDefaultValue(false);
+                entity.Property(e => e.IsActive).HasColumnName("isActive").HasDefaultValue(false);
+                entity.Property(e => e.StartDate).HasColumnName("startDate").HasMaxLength(50);
+                entity.Property(e => e.EndDate).HasColumnName("endDate").HasMaxLength(50);
                 entity.Property(e => e.IsDeleted).HasColumnName("isDeleted").HasDefaultValue(false);
                 entity.Property(e => e.DeleteDate).HasColumnName("deleteDate");
                 entity.Property(e => e.DeleteName).HasColumnName("deleteName").HasMaxLength(100);
@@ -128,7 +132,7 @@ namespace ASI.Basecode.Data
                 entity.Property(e => e.StudentId).HasColumnName("studentID");
                 entity.Property(e => e.CourseId).HasColumnName("courseID");
                 entity.Property(e => e.SemesterId).HasColumnName("semesterID");
-                entity.Property(e => e.GradeValue).HasColumnName("gradeValue").HasMaxLength(10);
+                entity.Property(e => e.GradeValue).HasColumnName("gradeValue").HasColumnType("decimal(3, 2)");
                 entity.Property(e => e.Units).HasColumnName("units");
                 entity.Property(e => e.NumberOfTakes).HasColumnName("numberOfTakes").HasDefaultValue(1);
                 entity.Property(e => e.CreatedAt).HasColumnName("createdAt").HasDefaultValueSql("GETDATE()");

@@ -231,6 +231,44 @@ BEGIN
     ALTER TABLE [dbo].[AdviserAssignments] ADD [deleteName] NVARCHAR(100) NULL;
 END
 ");
+
+            context.Database.ExecuteSqlRaw(@"
+IF COL_LENGTH('dbo.Semester', 'isCurrent') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Semester] ADD [isCurrent] BIT NOT NULL DEFAULT (0);
+END
+
+IF COL_LENGTH('dbo.Semester', 'isActive') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Semester] ADD [isActive] BIT NOT NULL DEFAULT (0);
+END
+
+IF COL_LENGTH('dbo.Semester', 'startDate') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Semester] ADD [startDate] NVARCHAR(50) NULL;
+END
+
+IF COL_LENGTH('dbo.Semester', 'endDate') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Semester] ADD [endDate] NVARCHAR(50) NULL;
+END
+");
+
+            context.Database.ExecuteSqlRaw(@"
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Semester] WHERE [isDeleted] = 0 AND ([isCurrent] = 1 OR [isActive] = 1))
+AND EXISTS (SELECT 1 FROM [dbo].[Semester] WHERE [isDeleted] = 0)
+BEGIN
+    ;WITH LatestSemester AS
+    (
+        SELECT TOP (1) *
+        FROM [dbo].[Semester]
+        WHERE [isDeleted] = 0
+        ORDER BY [semesterID] DESC
+    )
+    UPDATE LatestSemester
+    SET [isCurrent] = 1, [isActive] = 1;
+END
+");
         }
     }
 }

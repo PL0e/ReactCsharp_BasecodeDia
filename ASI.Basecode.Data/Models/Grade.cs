@@ -8,7 +8,7 @@ namespace ASI.Basecode.Data.Models
         public int StudentId { get; set; }
         public int CourseId { get; set; }
         public int SemesterId { get; set; }
-        public string GradeValue { get; set; }
+        public decimal? GradeValue { get; set; }
         public int? Units { get; set; }
         public int NumberOfTakes { get; set; }
         public DateTime CreatedAt { get; set; }
