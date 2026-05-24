@@ -7,9 +7,11 @@ using ASI.Basecode.WebApp.Authentication;
 using ASI.Basecode.WebApp.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
+using System.Collections.Generic;
 
 namespace ASI.Basecode.WebApp
 {
@@ -46,6 +48,10 @@ namespace ASI.Basecode.WebApp
 
             this._services.AddHttpClient();
 
+            var allowedOrigins = new HashSet<string>(
+                this.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
             this._services.AddCors(options =>
             {
                 options.AddPolicy("AllowReactApp", builder =>
@@ -56,6 +62,11 @@ namespace ASI.Basecode.WebApp
                             if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
                             {
                                 return false;
+                            }
+
+                            if (allowedOrigins.Contains(origin))
+                            {
+                                return true;
                             }
 
                             return uri.Scheme is "http" or "https"

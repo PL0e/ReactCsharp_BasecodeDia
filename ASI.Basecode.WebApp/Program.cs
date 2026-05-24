@@ -4,30 +4,39 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System;
 using System.IO;
 
-var appBuilder = WebApplication.CreateBuilder(new WebApplicationOptions
+try
 {
-    ContentRootPath = Directory.GetCurrentDirectory(),
-});
+    var appBuilder = WebApplication.CreateBuilder(new WebApplicationOptions
+    {
+        ContentRootPath = Directory.GetCurrentDirectory(),
+    });
 
-appBuilder.Configuration.AddJsonFile("appsettings.json",
-    optional: true,
-    reloadOnChange: true);
+    appBuilder.Configuration.AddJsonFile("appsettings.json",
+        optional: true,
+        reloadOnChange: true);
 
-appBuilder.WebHost.UseIISIntegration();
+    appBuilder.WebHost.UseIISIntegration();
 
-appBuilder.Logging
-    .AddConfiguration(appBuilder.Configuration.GetLoggingSection())
-    .AddConsole()
-    .AddDebug();
+    appBuilder.Logging
+        .AddConfiguration(appBuilder.Configuration.GetLoggingSection())
+        .AddConsole()
+        .AddDebug();
 
-var configurer = new StartupConfigurer(appBuilder.Configuration);
-configurer.ConfigureServices(appBuilder.Services);
+    var configurer = new StartupConfigurer(appBuilder.Configuration);
+    configurer.ConfigureServices(appBuilder.Services);
 
-var app = appBuilder.Build();
+    var app = appBuilder.Build();
 
-configurer.ConfigureApp(app, app.Environment);
+    configurer.ConfigureApp(app, app.Environment);
 
-// Run application
-app.Run();
+    // Run application
+    app.Run();
+}
+catch (Exception ex)
+{
+    Console.WriteLine(ex.ToString());
+    throw;
+}
